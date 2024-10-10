@@ -607,8 +607,19 @@ require('lazy').setup({
       local servers = {
         clangd = {},
         gopls = {},
-        basedpyright = {},
-        -- ruff = {},
+        basedpyright = {
+          settings = {
+            pyright = {
+              disableOrganizeImports = true,
+            },
+            python = {
+              analysis = {
+                ignore = { '*' },
+              },
+            },
+          },
+        },
+        ruff = {},
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -702,7 +713,7 @@ require('lazy').setup({
         lua = { 'stylua' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
-        -- python = { 'ruff' },
+        python = { 'ruff' },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
