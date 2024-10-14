@@ -382,12 +382,41 @@ require('lazy').setup({
         -- You can put your default mappings / updates / etc. in here
         --  All the info you're looking for is in `:help telescope.setup()`
         --
-        -- defaults = {
-        --   mappings = {
-        --     i = { ['<c-enter>'] = 'to_fuzzy_refine' },
-        --   },
-        -- },
-        -- pickers = {}
+        defaults = {
+          -- mappings = {
+          --   i = { ['<c-enter>'] = 'to_fuzzy_refine' },
+          -- },
+        },
+        -- pickers = {},
+        pickers = {
+          find_files = {
+            find_command = {
+              'rg',
+              '--files',
+              '--hidden',
+              '--follow',
+              '--glob',
+              '!.git/',
+              '--ignore',
+              '--glob',
+              '!.gitignore',
+              '--glob',
+              '!.gitmodules',
+              '--glob',
+              '!.gitattributes',
+            },
+          },
+          grep_string = {
+            additional_args = function()
+              return { '--hidden', '--follow', '--glob', '!.git/' }
+            end,
+          },
+          live_grep = {
+            additional_args = function()
+              return { '--hidden', '--follow', '--glob', '!.git/' }
+            end,
+          },
+        },
         extensions = {
           ['ui-select'] = {
             require('telescope.themes').get_dropdown(),
@@ -926,7 +955,93 @@ require('lazy').setup({
     'stevearc/oil.nvim',
     ---@module 'oil'
     ---@type oil.SetupOpts
-    opts = {},
+    opts = {
+      view_options = {
+        -- Simple hidden file check
+        is_hidden_file = function(name, bufnr)
+          local is_dotfile = vim.startswith(name, '.') and name ~= '..'
+          -- This will show all dotfiles as hidden for now
+          return is_dotfile
+        end,
+      },
+    },
+    config = function()
+      -- Disable netrw to avoid conflicts with oil.nvim
+      vim.g.loaded_netrw = 1
+      vim.g.loaded_netrwPlugin = 1
+
+      -- Automatically open oil.nvim for directories
+      vim.api.nvim_create_autocmd('BufEnter', {
+        pattern = '*',
+        callback = function()
+          if vim.bo.filetype == '' and vim.fn.isdirectory(vim.fn.expand '%') == 1 then
+            require('oil').open()
+          end
+        end,
+      })
+
+      -- Add git status tracking integration incrementally here
+      local function parse_output(proc)
+        local result = proc:wait()
+        local ret = {}
+        if result.code == 0 then
+          for line in vim.gsplit(result.stdout, '\n', { plain = true, trimempty = true }) do
+            line = line:gsub('/$', '') -- Remove trailing slash
+            ret[line] = true
+          end
+        end
+        return ret
+      end
+
+      -- Build git status cache
+      local function new_git_status()
+        return setmetatable({}, {
+          __index = function(self, key)
+            local ignore_proc = vim.system({ 'git', 'ls-files', '--ignored', '--exclude-standard', '--others', '--directory' }, { cwd = key, text = true })
+            local tracked_proc = vim.system({ 'git', 'ls-tree', 'HEAD', '--name-only' }, {
+              cwd = key,
+              text = true,
+            })
+            local ret = {
+              ignored = parse_output(ignore_proc),
+              tracked = parse_output(tracked_proc),
+            }
+
+            rawset(self, key, ret)
+            return ret
+          end,
+        })
+      end
+
+      -- Set up git status handling
+      local git_status = new_git_status()
+
+      -- Clear git status cache on refresh
+      local refresh = require('oil.actions').refresh
+      local orig_refresh = refresh.callback
+      refresh.callback = function(...)
+        git_status = new_git_status()
+        orig_refresh(...)
+      end
+
+      -- Customize oil.nvim to use git status in hidden file logic
+      require('oil').setup {
+        view_options = {
+          is_hidden_file = function(name, bufnr)
+            local dir = require('oil').get_current_dir(bufnr)
+            local is_dotfile = vim.startswith(name, '.') and name ~= '..'
+            if not dir then
+              return is_dotfile
+            end
+            if is_dotfile then
+              return not git_status[dir].tracked[name]
+            else
+              return git_status[dir].ignored[name]
+            end
+          end,
+        },
+      }
+    end,
     -- Optional dependencies
     dependencies = { { 'echasnovski/mini.icons', opts = {} } },
     -- dependencies = { "nvim-tree/nvim-web-devicons" }, -- use if prefer nvim-web-devicons
