@@ -970,6 +970,9 @@ require('lazy').setup({
       vim.g.loaded_netrw = 1
       vim.g.loaded_netrwPlugin = 1
 
+      -- Open oil.nvim
+      vim.keymap.set('n', '<leader>fm', require('oil').open, { desc = 'Open oil.nvim' })
+
       -- Automatically open oil.nvim for directories
       vim.api.nvim_create_autocmd('BufEnter', {
         pattern = '*',
