@@ -929,8 +929,13 @@ require('lazy').setup({
     'nvim-treesitter/nvim-treesitter',
     build = ':TSUpdate',
     main = 'nvim-treesitter.config', -- Sets main module to use for opts
+    init = function()
+      local install_dir = vim.fs.normalize(vim.fn.stdpath 'state' .. '/treesitter')
+      vim.opt.runtimepath:prepend(install_dir)
+    end,
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
+      install_dir = vim.fn.stdpath 'state' .. '/treesitter',
       ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
       -- Autoinstall languages that are not installed
       auto_install = true,
